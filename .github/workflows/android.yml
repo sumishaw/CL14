@@ -58,7 +58,26 @@ jobs:
       - name: Generate Gradle wrapper
         run: |
           cd android
-          curl -sL https://services.gradle.org/distributions/gradle-8.14.0-bin.zip -o /tmp/gradle.zip
+          # Download with retry and validation
+          for attempt in {1..3}; do
+            echo "Download attempt $attempt..."
+            curl -fL https://services.gradle.org/distributions/gradle-8.14.0-bin.zip -o /tmp/gradle.zip
+            if unzip -t /tmp/gradle.zip > /dev/null 2>&1; then
+              echo "Gradle ZIP verified successfully"
+              break
+            else
+              echo "Download failed or corrupted, retrying..."
+              rm -f /tmp/gradle.zip
+              [ $attempt -lt 3 ] && sleep 5
+            fi
+          done
+          
+          # Check if download succeeded
+          if [ ! -f /tmp/gradle.zip ]; then
+            echo "Failed to download Gradle after 3 attempts"
+            exit 1
+          fi
+          
           unzip -q /tmp/gradle.zip -d /tmp/gradle-install
           /tmp/gradle-install/gradle-8.14.0/bin/gradle wrapper --gradle-version 8.14.0 --distribution-type all
           chmod +x gradlew
